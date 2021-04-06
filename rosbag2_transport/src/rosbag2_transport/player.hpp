@@ -50,6 +50,9 @@ public:
     std::shared_ptr<rclcpp::Node> transport_node);
 
   void play(const PlayOptions & options);
+  void pause();
+  void resume();
+  bool is_paused() const;
 
 private:
   void load_storage_content(const PlayOptions & options);

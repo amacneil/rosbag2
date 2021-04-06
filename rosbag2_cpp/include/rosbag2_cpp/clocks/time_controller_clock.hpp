@@ -73,6 +73,26 @@ public:
   ROSBAG2_CPP_PUBLIC
   double get_rate() const override;
 
+  /**
+   * Stop the flow of time of the clock.
+   * If this changes the pause state, this will wake any waiting `sleep_until`
+   */
+  ROSBAG2_CPP_PUBLIC
+  void pause();
+
+  /**
+   * Start the flow of time of the clock
+   * If this changes the pause state, this will wake any waiting `sleep_until`
+   */
+  ROSBAG2_CPP_PUBLIC
+  void resume();
+
+  /**
+   * Return whether the clock is currently paused.
+   */
+  ROSBAG2_CPP_PUBLIC
+  bool is_paused() const;
+
 private:
   std::unique_ptr<TimeControllerClockImpl> impl_;
 };

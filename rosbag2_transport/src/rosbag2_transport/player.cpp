@@ -117,6 +117,28 @@ void Player::play(const PlayOptions & options)
   play_messages_from_queue();
 }
 
+void Player::pause()
+{
+  if (clock_) {
+    clock_->pause();
+  }
+}
+
+void Player::resume()
+{
+  if (clock_) {
+    clock_->resume();
+  }
+}
+
+bool Player::is_paused() const
+{
+  if (clock_) {
+    return clock_->is_paused();
+  }
+  return false;
+}
+
 void Player::wait_for_filled_queue(const PlayOptions & options) const
 {
   while (
