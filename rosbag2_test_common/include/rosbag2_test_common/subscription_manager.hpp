@@ -55,8 +55,13 @@ public:
       subscriber_node_->create_subscription<MessageT>(
         topic_name,
         qos,
-        [this, topic_name](std::shared_ptr<rclcpp::SerializedMessage> msg) {
+        [this, topic_name](std::shared_ptr<rclcpp::SerializedMessage> msg)
+        {
           subscribed_messages_[topic_name].push_back(msg);
+          // NOTE: would use MessageInfo, but
+          // source/received timestamps aren't supported on cyclone yet
+          subscribed_messages_received_time_[topic_name].push_back(
+            std::chrono::steady_clock::now());
         },
         options));
   }
@@ -73,6 +78,12 @@ public:
       received_messages_on_topic.push_back(msg);
     }
     return received_messages_on_topic;
+  }
+
+  std::vector<std::chrono::steady_clock::time_point> get_received_messages_time(
+    const std::string & topic_name)
+  {
+    return subscribed_messages_received_time_[topic_name];
   }
 
   std::future<void> spin_subscriptions()
@@ -100,6 +111,9 @@ private:
   std::vector<rclcpp::SubscriptionBase::SharedPtr> subscriptions_;
   std::unordered_map<std::string,
     std::vector<std::shared_ptr<rclcpp::SerializedMessage>>> subscribed_messages_;
+  std::unordered_map<
+    std::string, std::vector<std::chrono::steady_clock::time_point>
+  > subscribed_messages_received_time_;
   std::unordered_map<std::string, size_t> expected_topics_with_size_;
   rclcpp::Node::SharedPtr subscriber_node_;
   MemoryManagement memory_management_;

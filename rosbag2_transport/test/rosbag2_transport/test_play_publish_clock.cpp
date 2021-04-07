@@ -26,17 +26,28 @@
 
 using namespace ::testing;  // NOLINT
 
+namespace
+{
+template<typename Duration>
+rcutils_duration_value_t as_nanos(Duration d)
+{
+  return std::chrono::duration_cast<std::chrono::nanoseconds>(d).count();
+}
+
+rcutils_duration_value_t period_for_frequency(double frequency)
+{
+  return static_cast<rcutils_duration_value_t>(RCUTILS_S_TO_NS(1) / frequency);
+}
+}  // namespace
+
 TEST_F(RosBag2PlayTestFixture, clock_is_published_at_chosen_frequency)
 {
   // Test values
   play_options_.clock_publish_frequency = 20;
   const size_t messages_to_play = 10;
-  const int64_t milliseconds_between_messages = 200;
-  const auto bag_duration_seconds =
-    (messages_to_play - 1) * milliseconds_between_messages / 1000.f;
-  const auto error_tolerance = 0.1;
-  const size_t expected_clock_messages =
-    bag_duration_seconds * play_options_.clock_publish_frequency * (1.0 - error_tolerance);
+  const auto milliseconds_between_messages = 200;
+  // Wait for just a few clock messages, we're checking the time between them, not the total count
+  const size_t expected_clock_messages = 4;
 
   // Fake bag setup
   auto topic_types = std::vector<rosbag2_storage::TopicMetadata>{
@@ -46,7 +57,7 @@ TEST_F(RosBag2PlayTestFixture, clock_is_published_at_chosen_frequency)
   std::vector<std::shared_ptr<rosbag2_storage::SerializedBagMessage>> messages;
   for (size_t i = 0; i < messages_to_play; i++) {
     auto message = get_messages_basic_types()[0];
-    message->int32_value = i;
+    message->int32_value = static_cast<int32_t>(i);
     messages.push_back(
       serialize_test_message("topic1", milliseconds_between_messages * i, message));
   }
@@ -65,6 +76,17 @@ TEST_F(RosBag2PlayTestFixture, clock_is_published_at_chosen_frequency)
   rosbag2_transport.play(storage_options_, play_options_);
   await_received_messages.get();
 
+  // Check that we got enough messages
   auto received_clock = sub_->get_received_messages<rosgraph_msgs::msg::Clock>("/clock");
   EXPECT_THAT(received_clock, SizeIs(Ge(expected_clock_messages)));
+
+  // Check time deltas between messages
+  auto message_times = sub_->get_received_messages_time("/clock");
+  const auto expect_clock_delta = period_for_frequency(play_options_.clock_publish_frequency);
+  const auto allowed_error = static_cast<rcutils_duration_value_t>(expect_clock_delta * 0.1);
+  for (size_t i = 0; i < expected_clock_messages - 1; i++) {
+    auto delta = message_times[i + 1] - message_times[i];
+    auto error = std::abs(as_nanos(delta) - expect_clock_delta);
+    EXPECT_LE(error, allowed_error);
+  }
 }
